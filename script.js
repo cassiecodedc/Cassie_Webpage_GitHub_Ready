@@ -139,6 +139,32 @@ document.querySelectorAll("[data-phone-demo]").forEach((demo) => {
     }
   };
 
+  const prepareDraftVideo = () => {
+    if (video instanceof HTMLVideoElement) {
+      video.classList.add("has-source");
+      video.muted = true;
+      video.pause();
+      try {
+        video.currentTime = 0;
+      } catch {
+        // Some browsers do not allow seeking until metadata is ready.
+      }
+    }
+
+    if (postedVideo instanceof HTMLVideoElement) {
+      postedVideo.classList.add("has-source");
+      postedVideo.muted = true;
+      postedVideo.pause();
+      try {
+        postedVideo.currentTime = 0;
+      } catch {
+        // Some browsers do not allow seeking until metadata is ready.
+      }
+    }
+
+    syncSoundButtons(true);
+  };
+
   const runShareSequence = () => {
     window.clearTimeout(shareTimer);
     window.clearTimeout(sharedTimer);
@@ -152,9 +178,9 @@ document.querySelectorAll("[data-phone-demo]").forEach((demo) => {
 
       if (postedVideo instanceof HTMLVideoElement) {
         postedVideo.classList.add("has-source");
-        postedVideo.muted = video instanceof HTMLVideoElement ? video.muted : true;
+        postedVideo.muted = true;
         try {
-          postedVideo.currentTime = video instanceof HTMLVideoElement ? video.currentTime : 0;
+          postedVideo.currentTime = 0;
         } catch {
           postedVideo.currentTime = 0;
         }
@@ -176,7 +202,7 @@ document.querySelectorAll("[data-phone-demo]").forEach((demo) => {
     hasTyped = true;
     caption.textContent = "";
     window.clearInterval(typingTimer);
-    await playVideo();
+    prepareDraftVideo();
 
     typingTimer = window.setInterval(() => {
       caption.textContent = text.slice(0, index);
