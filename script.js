@@ -88,6 +88,33 @@ document.querySelectorAll("[data-phone-demo]").forEach((demo) => {
   let hasTyped = false;
   let isPhoneLocked = false;
 
+  const syncSoundButtons = (isMuted) => {
+    if (soundButton) {
+      soundButton.textContent = isMuted ? "Listen" : "Sound on";
+      soundButton.setAttribute("aria-label", isMuted ? "Listen to reel" : "Mute reel");
+    }
+
+    if (postedSoundButton) {
+      postedSoundButton.textContent = isMuted ? "Listen" : "Sound on";
+      postedSoundButton.setAttribute("aria-label", isMuted ? "Listen to posted reel" : "Mute posted reel");
+    }
+  };
+
+  const keepDemoActive = () => {
+    if (!feature) return;
+
+    clearActiveFeatures(feature);
+    feature.classList.add("is-active");
+    isPhoneLocked = true;
+  };
+
+  const keepPlaying = (media) => {
+    if (!(media instanceof HTMLVideoElement)) return;
+
+    media.classList.add("has-source");
+    media.play().catch(() => {});
+  };
+
   const playVideo = async () => {
     if (!(video instanceof HTMLVideoElement)) return;
 
@@ -280,36 +307,40 @@ document.querySelectorAll("[data-phone-demo]").forEach((demo) => {
     postedVideo.load();
   }
 
-  replayButton?.addEventListener("click", playVideo);
+  replayButton?.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    keepDemoActive();
+    playVideo();
+  });
 
-  soundButton?.addEventListener("click", () => {
+  soundButton?.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
     if (!(video instanceof HTMLVideoElement)) return;
 
+    keepDemoActive();
     video.muted = !video.muted;
     if (postedVideo instanceof HTMLVideoElement) {
       postedVideo.muted = video.muted;
     }
-    soundButton.textContent = video.muted ? "Listen" : "Sound on";
-    soundButton.setAttribute("aria-label", video.muted ? "Listen to reel" : "Mute reel");
-    if (postedSoundButton) {
-      postedSoundButton.textContent = video.muted ? "Listen" : "Sound on";
-      postedSoundButton.setAttribute("aria-label", video.muted ? "Listen to posted reel" : "Mute posted reel");
-    }
+    syncSoundButtons(video.muted);
+    keepPlaying(video);
+    keepPlaying(postedVideo);
   });
 
-  postedSoundButton?.addEventListener("click", () => {
+  postedSoundButton?.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
     if (!(postedVideo instanceof HTMLVideoElement)) return;
 
+    keepDemoActive();
     postedVideo.muted = !postedVideo.muted;
     if (video instanceof HTMLVideoElement) {
       video.muted = postedVideo.muted;
     }
-    postedSoundButton.textContent = postedVideo.muted ? "Listen" : "Sound on";
-    postedSoundButton.setAttribute("aria-label", postedVideo.muted ? "Listen to posted reel" : "Mute posted reel");
-    if (soundButton) {
-      soundButton.textContent = postedVideo.muted ? "Listen" : "Sound on";
-      soundButton.setAttribute("aria-label", postedVideo.muted ? "Listen to reel" : "Mute reel");
-    }
+    syncSoundButtons(postedVideo.muted);
+    keepPlaying(postedVideo);
   });
 });
 
