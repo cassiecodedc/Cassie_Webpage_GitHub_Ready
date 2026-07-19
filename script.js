@@ -71,6 +71,8 @@ const isPointerInsideActivePhone = (event) => {
   });
 };
 
+const isMobileWorkLayout = () => window.matchMedia("(max-width: 900px)").matches;
+
 document.querySelectorAll("[data-phone-demo]").forEach((demo) => {
   const replayButton = demo.querySelector(".mock-replay");
   const soundButton = demo.querySelector(".mock-sound");
@@ -165,6 +167,37 @@ document.querySelectorAll("[data-phone-demo]").forEach((demo) => {
     syncSoundButtons(true);
   };
 
+  const publishImmediatelyForMobile = () => {
+    if (!isMobileWorkLayout() || hasTyped) return false;
+
+    hasTyped = true;
+    window.clearInterval(typingTimer);
+    window.clearTimeout(shareTimer);
+    window.clearTimeout(sharedTimer);
+
+    if (caption instanceof HTMLElement) {
+      caption.textContent = caption.dataset.caption || "";
+    }
+
+    prepareDraftVideo();
+    demo.classList.remove("is-clicking-share");
+    demo.classList.add("is-ready-share", "is-shared");
+
+    if (postedVideo instanceof HTMLVideoElement) {
+      postedVideo.classList.add("has-source");
+      postedVideo.muted = true;
+      postedVideo.load();
+      try {
+        postedVideo.currentTime = 0;
+      } catch {
+        // Some browsers do not allow seeking until metadata is ready.
+      }
+      postedVideo.play().catch(() => {});
+    }
+
+    return true;
+  };
+
   const runShareSequence = () => {
     window.clearTimeout(shareTimer);
     window.clearTimeout(sharedTimer);
@@ -257,7 +290,9 @@ document.querySelectorAll("[data-phone-demo]").forEach((demo) => {
       if (event instanceof PointerEvent || event instanceof MouseEvent) {
         movePhone(event);
       }
-      typeCaption();
+      if (!publishImmediatelyForMobile()) {
+        typeCaption();
+      }
       if (hasTyped && demo.classList.contains("is-shared") && postedVideo instanceof HTMLVideoElement) {
         postedVideo.play().catch(() => {});
       }
@@ -284,6 +319,19 @@ document.querySelectorAll("[data-phone-demo]").forEach((demo) => {
     row.addEventListener("mouseenter", activateFeature);
     row.addEventListener("mousemove", movePhone);
     row.addEventListener("mouseleave", deactivateUnlessEnteringPhone);
+    row.addEventListener("click", (event) => {
+      if (!isMobileWorkLayout()) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+
+      if (feature.classList.contains("is-active")) {
+        deactivateFeature();
+        return;
+      }
+
+      activateFeature(event);
+    });
 
     phone.addEventListener("pointerenter", () => {
       clearActiveFeatures(feature);
@@ -303,17 +351,15 @@ document.querySelectorAll("[data-phone-demo]").forEach((demo) => {
 
     trigger.addEventListener("focusin", () => {
       feature.classList.add("is-active");
-      typeCaption();
+      if (!publishImmediatelyForMobile()) {
+        typeCaption();
+      }
     });
 
     trigger.addEventListener("focusout", () => {
       feature.classList.remove("is-active");
       stopFeatureMedia(feature);
     });
-  }
-
-  if (window.matchMedia("(max-width: 900px)").matches) {
-    window.setTimeout(typeCaption, 700);
   }
 
   if (video instanceof HTMLVideoElement) {
@@ -371,6 +417,8 @@ document.querySelectorAll("[data-phone-demo]").forEach((demo) => {
 });
 
 document.querySelectorAll(".social-feature-video").forEach((feature) => {
+  const row = feature.querySelector(".social-row");
+
   feature.addEventListener("pointerenter", (event) => {
     if (isPointerInsideActivePhone(event) && !feature.classList.contains("is-active")) return;
 
@@ -382,6 +430,36 @@ document.querySelectorAll(".social-feature-video").forEach((feature) => {
     feature.classList.remove("is-active");
     stopFeatureMedia(feature);
   });
+
+  row?.addEventListener("click", (event) => {
+    if (!isMobileWorkLayout()) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    if (feature.classList.contains("is-active")) {
+      feature.classList.remove("is-active");
+      stopFeatureMedia(feature);
+      return;
+    }
+
+    clearActiveFeatures(feature);
+    feature.classList.add("is-active");
+  });
+});
+
+document.querySelectorAll(".media-feature").forEach((feature) => {
+  const row = feature.querySelector(".media-row");
+
+  row?.addEventListener("click", (event) => {
+    if (!isMobileWorkLayout()) return;
+
+    if (!feature.classList.contains("is-active")) {
+      event.preventDefault();
+      clearActiveFeatures(feature);
+      feature.classList.add("is-active");
+    }
+  });
 });
 
 document.querySelectorAll("[data-newspaper-carousel]").forEach((section) => {
@@ -391,6 +469,7 @@ document.querySelectorAll("[data-newspaper-carousel]").forEach((section) => {
   let ticking = false;
   let hoverProgress = null;
   let hoverTarget = null;
+  let manualIndex = null;
   let hoverTimer;
 
   const getScrollProgress = () => {
@@ -401,12 +480,12 @@ document.querySelectorAll("[data-newspaper-carousel]").forEach((section) => {
 
   const getCurrentIndex = () => {
     const maxIndex = Math.max(papers.length - 1, 1);
-    return Math.min(Math.round(hoverProgress ?? getScrollProgress() * maxIndex), papers.length - 1);
+    return Math.min(Math.round(manualIndex ?? hoverProgress ?? getScrollProgress() * maxIndex), papers.length - 1);
   };
 
   const updateNewspaperCarousel = () => {
     const maxIndex = Math.max(papers.length - 1, 1);
-    const progress = hoverProgress ?? getScrollProgress() * maxIndex;
+    const progress = manualIndex ?? hoverProgress ?? getScrollProgress() * maxIndex;
     const activeIndex = Math.min(Math.round(progress), papers.length - 1);
 
     section.style.setProperty("--paper-shift", progress.toFixed(3));
@@ -430,16 +509,28 @@ document.querySelectorAll("[data-newspaper-carousel]").forEach((section) => {
 
   const setManualPaper = (direction) => {
     const maxIndex = Math.max(papers.length - 1, 1);
-    hoverProgress = Math.min(Math.max(getCurrentIndex() + direction, 0), maxIndex);
-    hoverTarget = hoverProgress;
+    manualIndex = Math.min(Math.max(getCurrentIndex() + direction, 0), maxIndex);
+    hoverProgress = manualIndex;
+    hoverTarget = manualIndex;
     window.clearTimeout(hoverTimer);
     requestUpdate();
   };
 
-  previousButton?.addEventListener("click", () => setManualPaper(-1));
-  nextButton?.addEventListener("click", () => setManualPaper(1));
+  previousButton?.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setManualPaper(-1);
+  });
+
+  nextButton?.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setManualPaper(1);
+  });
 
   section.addEventListener("pointermove", (event) => {
+    if (event.target instanceof Element && event.target.closest(".newspaper-controls")) return;
+
     const rect = section.getBoundingClientRect();
     const localX = Math.min(Math.max(event.clientX - rect.left, 0), rect.width);
     const maxIndex = Math.max(papers.length - 1, 1);
@@ -462,6 +553,7 @@ document.querySelectorAll("[data-newspaper-carousel]").forEach((section) => {
       hoverTarget = nextTarget;
       window.clearTimeout(hoverTimer);
       hoverTimer = window.setTimeout(() => {
+        manualIndex = null;
         hoverProgress = hoverTarget;
         requestUpdate();
       }, 620);
@@ -471,7 +563,9 @@ document.querySelectorAll("[data-newspaper-carousel]").forEach((section) => {
   section.addEventListener("pointerleave", () => {
     window.clearTimeout(hoverTimer);
     hoverTarget = null;
-    hoverProgress = null;
+    if (manualIndex === null) {
+      hoverProgress = null;
+    }
     requestUpdate();
   });
 });
